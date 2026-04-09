@@ -68,7 +68,8 @@ db-shell: ## Open psql in database container
 
 # ─── Database ───────────────────────────────────────
 db-reset: ## Destroy and recreate database (WARNING: deletes all data)
-	docker compose down -v
+	docker compose down
+	rm -rf data/postgres
 	docker compose up -d
 	@echo "⏳ Waiting for services..."
 	@sleep 5

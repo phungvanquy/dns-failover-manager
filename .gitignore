@@ -18,6 +18,7 @@ build/
 
 # Docker
 postgres_data/
+data/
 
 # IDE
 .vscode/
