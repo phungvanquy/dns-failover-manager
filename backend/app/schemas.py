@@ -32,6 +32,7 @@ class DomainBase(BaseModel):
     check_interval: int = 30
     expected_status: int = 200
     ttl: int = 60
+    monitoring_enabled: bool = True
 
 
 class DomainCreate(DomainBase):
@@ -50,6 +51,7 @@ class DomainUpdate(BaseModel):
     check_interval: int | None = None
     expected_status: int | None = None
     ttl: int | None = None
+    monitoring_enabled: bool | None = None
     backup_ips: list[BackupIPCreate] | None = None
 
 

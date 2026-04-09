@@ -106,6 +106,7 @@ dns-failover-manager/
 - **DomainForm** — adaptive form: shows endpoint+status for HTTP/HTTPS, port for TCP, info banner for Ping
 - **DomainRow** — shows domain name, active/primary/backup IPs, health status (🟢/🔴), force switch dropdown
 - **Force Switch** — click-outside-to-close dropdown with IP list, health indicators, labels (active/primary/backup#)
+- **Monitoring Toggle** — Pause/Resume button per domain; paused domains show PAUSED badge and dimmed card
 - Polls `/api/domains` + `/api/domains/:id/health` every 10s
 
 ---
@@ -115,7 +116,7 @@ dns-failover-manager/
 ```
 domains: id, name(unique), zone_id, record_id, primary_ip, active_ip, auto_revert,
          check_type, check_endpoint, check_port, check_interval, expected_status, ttl,
-         created_at, updated_at
+         monitoring_enabled, created_at, updated_at
 
 backup_ips: id, domain_id(FK), ip, priority, created_at
 

@@ -48,6 +48,7 @@ async def create_domain(data: DomainCreate, db: AsyncSession = Depends(get_db)):
         check_interval=data.check_interval,
         expected_status=data.expected_status,
         ttl=data.ttl,
+        monitoring_enabled=data.monitoring_enabled,
     )
     db.add(domain)
     await db.flush()
@@ -55,8 +56,8 @@ async def create_domain(data: DomainCreate, db: AsyncSession = Depends(get_db)):
     for bp in data.backup_ips:
         db.add(BackupIP(domain_id=domain.id, ip=bp.ip, priority=bp.priority))
 
-    # Create health status entries for all IPs
-    all_ips = [data.primary_ip] + [bp.ip for bp in data.backup_ips]
+    # Create health status entries for all unique IPs
+    all_ips = dict.fromkeys([data.primary_ip] + [bp.ip for bp in data.backup_ips])
     for ip in all_ips:
         db.add(HealthStatus(domain_id=domain.id, ip=ip, is_healthy=True))
 
@@ -98,7 +99,8 @@ async def update_domain(domain_id: uuid.UUID, data: DomainUpdate, db: AsyncSessi
             db.add(BackupIP(domain_id=domain_id, ip=bp["ip"], priority=bp["priority"]))
         # Rebuild health statuses
         await db.execute(delete(HealthStatus).where(HealthStatus.domain_id == domain_id))
-        all_ips = [domain.primary_ip] + [bp["ip"] for bp in backup_ips_data]
+        await db.flush()
+        all_ips = dict.fromkeys([domain.primary_ip] + [bp["ip"] for bp in backup_ips_data])
         for ip in all_ips:
             db.add(HealthStatus(domain_id=domain_id, ip=ip, is_healthy=True))
 
@@ -173,6 +175,22 @@ async def force_switch(domain_id: uuid.UUID, data: ForceSwitchRequest, db: Async
     old_ip = domain.active_ip
     domain.active_ip = data.target_ip
     db.add(FailoverEvent(domain_id=domain_id, old_ip=old_ip, new_ip=data.target_ip, reason="manual"))
+    await db.commit()
+    await db.refresh(domain)
+    await db.refresh(domain, ["backup_ips"])
+    return domain
+
+
+@router.post("/domains/{domain_id}/monitoring", response_model=DomainOut)
+async def toggle_monitoring(domain_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Domain).where(Domain.id == domain_id).options(selectinload(Domain.backup_ips))
+    )
+    domain = result.scalar_one_or_none()
+    if not domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+
+    domain.monitoring_enabled = not domain.monitoring_enabled
     await db.commit()
     await db.refresh(domain)
     await db.refresh(domain, ["backup_ips"])

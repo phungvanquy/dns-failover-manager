@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
+import { useToast } from './components/Toast'
 import type { Domain, HealthStatus } from './types'
 import DomainForm from './components/DomainForm'
 import DomainRow from './components/DomainRow'
 
 export default function App() {
+  const toast = useToast()
   const [domains, setDomains] = useState<Domain[]>([])
   const [healthMap, setHealthMap] = useState<Record<string, HealthStatus[]>>({})
   const [showForm, setShowForm] = useState(false)
@@ -28,8 +30,12 @@ export default function App() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this domain?')) return
-    await api.del(`/domains/${id}`)
-    loadDomains()
+    try {
+      await api.del(`/domains/${id}`)
+      loadDomains()
+    } catch (err: any) {
+      toast.showError(err.message || 'Failed to delete domain')
+    }
   }
 
   return (

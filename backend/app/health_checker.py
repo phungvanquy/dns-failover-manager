@@ -109,7 +109,7 @@ async def process_domain(domain: Domain):
                     select(HealthStatus).where(
                         HealthStatus.domain_id == domain.id,
                         HealthStatus.ip == ip,
-                    )
+                    ).limit(1)
                 )
                 hs = result.scalar_one_or_none()
                 if not hs:
@@ -224,7 +224,7 @@ async def run_health_checks():
     try:
         async with async_session() as db:
             result = await db.execute(
-                select(Domain).options(selectinload(Domain.backup_ips))
+                select(Domain).where(Domain.monitoring_enabled == True).options(selectinload(Domain.backup_ips))
             )
             domains = result.scalars().all()
 

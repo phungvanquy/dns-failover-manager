@@ -18,6 +18,7 @@ export interface Domain {
   check_interval: number;
   expected_status: number;
   ttl: number;
+  monitoring_enabled: boolean;
   created_at: string;
   updated_at: string;
   backup_ips: BackupIP[];

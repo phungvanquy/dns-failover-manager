@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class Domain(Base):
     check_interval: Mapped[int] = mapped_column(Integer, default=30)
     expected_status: Mapped[int] = mapped_column(Integer, default=200)
     ttl: Mapped[int] = mapped_column(Integer, default=60)
+    monitoring_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -46,6 +47,7 @@ class BackupIP(Base):
 
 class HealthStatus(Base):
     __tablename__ = "health_status"
+    __table_args__ = (UniqueConstraint("domain_id", "ip", name="uq_health_status_domain_ip"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     domain_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("domains.id", ondelete="CASCADE"), nullable=False)

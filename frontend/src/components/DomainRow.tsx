@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api'
+import { useToast } from './Toast'
 import type { Domain, HealthStatus } from '../types'
 
 interface Props {
@@ -11,8 +12,10 @@ interface Props {
 }
 
 export default function DomainRow({ domain, health, onEdit, onDelete, onRefresh }: Props) {
+  const toast = useToast()
   const [switching, setSwitching] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const activeHealth = health.find(h => h.ip === domain.active_ip)
@@ -34,14 +37,28 @@ export default function DomainRow({ domain, health, onEdit, onDelete, onRefresh 
     try {
       await api.post(`/domains/${domain.id}/switch`, { target_ip: ip })
       onRefresh()
+    } catch (err: any) {
+      toast.showError(err.message || 'Failed to switch IP')
     } finally {
       setSwitching(false)
       setShowMenu(false)
     }
   }
 
+  const handleToggleMonitoring = async () => {
+    setToggling(true)
+    try {
+      await api.post(`/domains/${domain.id}/monitoring`)
+      onRefresh()
+    } catch (err: any) {
+      toast.showError(err.message || 'Failed to toggle monitoring')
+    } finally {
+      setToggling(false)
+    }
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow p-4 flex flex-col gap-3">
+    <div className={`bg-white rounded-lg shadow p-4 flex flex-col gap-3 ${!domain.monitoring_enabled ? 'opacity-60' : ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -50,8 +67,20 @@ export default function DomainRow({ domain, health, onEdit, onDelete, onRefresh 
           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
             {domain.check_type.toUpperCase()}
           </span>
+          {!domain.monitoring_enabled && (
+            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">PAUSED</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleMonitoring}
+            disabled={toggling}
+            className={`text-sm px-3 py-1 border rounded ${domain.monitoring_enabled
+              ? 'border-yellow-300 text-yellow-700 hover:bg-yellow-50'
+              : 'border-green-300 text-green-700 hover:bg-green-50'}`}
+          >
+            {domain.monitoring_enabled ? '⏸ Pause' : '▶ Resume'}
+          </button>
           <button onClick={onEdit} className="text-sm px-3 py-1 border rounded hover:bg-gray-50">Edit</button>
           <button onClick={onDelete} className="text-sm px-3 py-1 border border-red-200 text-red-600 rounded hover:bg-red-50">Delete</button>
         </div>
