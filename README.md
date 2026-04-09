@@ -17,7 +17,7 @@ A lightweight, self-hosted tool that monitors server health and automatically up
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/dns-failover-manager.git
+git clone git@github.com:phungvanquy/dns-failover-manager.git
 cd dns-failover-manager
 
 # Setup environment
