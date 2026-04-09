@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.database import engine, Base
-from app.health_checker import health_check_loop
+from app.health_checker import health_check_loop, cleanup_loop
 from app.routers import domains
 
 logging.basicConfig(level=settings.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,12 +27,21 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(health_check_loop())
     logger.info("Health check worker scheduled")
 
+    # Start cleanup background worker
+    cleanup_task = asyncio.create_task(cleanup_loop())
+    logger.info("Cleanup worker scheduled")
+
     yield
 
     # Shutdown
     task.cancel()
+    cleanup_task.cancel()
     try:
         await task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await cleanup_task
     except asyncio.CancelledError:
         pass
 

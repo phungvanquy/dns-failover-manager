@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     FAILURE_THRESHOLD: int = 3
     SUCCESS_THRESHOLD: int = 2
     LOG_LEVEL: str = "INFO"
+    LOG_RETENTION_DAYS: int = 7
+    EVENT_RETENTION_DAYS: int = 30
+    CLEANUP_INTERVAL_HOURS: int = 6
 
     class Config:
         env_file = ".env"

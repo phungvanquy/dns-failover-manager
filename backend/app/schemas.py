@@ -88,6 +88,10 @@ class FailoverEventOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FailoverEventWithDomain(FailoverEventOut):
+    domain_name: str
+
+
 # --- Force Switch ---
 class ForceSwitchRequest(BaseModel):
     target_ip: str

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import select
@@ -243,3 +243,37 @@ async def health_check_loop():
     while True:
         await run_health_checks()
         await asyncio.sleep(settings.DEFAULT_CHECK_INTERVAL)
+
+
+async def cleanup_old_data():
+    """Delete old health_check_log and failover_events entries."""
+    from sqlalchemy import delete as sa_delete
+    try:
+        async with async_session() as db:
+            log_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.LOG_RETENTION_DAYS)
+            result = await db.execute(
+                sa_delete(HealthCheckLog).where(HealthCheckLog.created_at < log_cutoff)
+            )
+            log_count = result.rowcount
+
+            event_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.EVENT_RETENTION_DAYS)
+            result = await db.execute(
+                sa_delete(FailoverEvent).where(FailoverEvent.created_at < event_cutoff)
+            )
+            event_count = result.rowcount
+
+            await db.commit()
+            if log_count or event_count:
+                logger.info("Cleanup: deleted %d health check logs (>%dd) and %d failover events (>%dd)",
+                            log_count, settings.LOG_RETENTION_DAYS, event_count, settings.EVENT_RETENTION_DAYS)
+    except Exception as e:
+        logger.error("Cleanup failed: %s", e)
+
+
+async def cleanup_loop():
+    """Background loop that periodically cleans up old data."""
+    logger.info("Cleanup worker started (interval: %dh, log retention: %dd, event retention: %dd)",
+                settings.CLEANUP_INTERVAL_HOURS, settings.LOG_RETENTION_DAYS, settings.EVENT_RETENTION_DAYS)
+    while True:
+        await cleanup_old_data()
+        await asyncio.sleep(settings.CLEANUP_INTERVAL_HOURS * 3600)

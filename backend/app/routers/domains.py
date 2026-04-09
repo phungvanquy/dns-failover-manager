@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models import Domain, BackupIP, HealthStatus, FailoverEvent
 from app.schemas import (
     DomainCreate, DomainOut, DomainUpdate,
-    HealthStatusOut, FailoverEventOut, ForceSwitchRequest,
+    HealthStatusOut, FailoverEventOut, FailoverEventWithDomain, ForceSwitchRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -195,3 +195,26 @@ async def toggle_monitoring(domain_id: uuid.UUID, db: AsyncSession = Depends(get
     await db.refresh(domain)
     await db.refresh(domain, ["backup_ips"])
     return domain
+
+
+@router.get("/events", response_model=list[FailoverEventWithDomain])
+async def get_all_events(limit: int = 50, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(FailoverEvent, Domain.name)
+        .join(Domain, FailoverEvent.domain_id == Domain.id)
+        .order_by(FailoverEvent.created_at.desc())
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        FailoverEventWithDomain(
+            id=event.id,
+            domain_id=event.domain_id,
+            old_ip=event.old_ip,
+            new_ip=event.new_ip,
+            reason=event.reason,
+            created_at=event.created_at,
+            domain_name=domain_name,
+        )
+        for event, domain_name in rows
+    ]

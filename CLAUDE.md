@@ -45,13 +45,15 @@ dns-failover-manager/
     ├── postcss.config.js
     ├── index.html
     └── src/
-        ├── main.tsx            # React root
-        ├── App.tsx             # Main layout: domain card list + add/edit form
-        ├── api.ts              # Fetch wrapper (get/post/put/del)
+        ├── main.tsx            # React root (wrapped with ToastProvider)
+        ├── App.tsx             # Main layout: domain card list + add/edit form + activity log
+        ├── api.ts              # Fetch wrapper (get/post/put/del) with error detail extraction
         ├── types.ts            # TypeScript interfaces (Domain, BackupIP, HealthStatus, FailoverEvent)
         └── components/
-            ├── DomainForm.tsx   # Add/edit form — fields adapt per check_type
-            └── DomainRow.tsx    # Domain card with status, IPs, force switch dropdown
+            ├── DomainForm.tsx   # Add/edit form — fields adapt per check_type, client-side validation
+            ├── DomainRow.tsx    # Domain card with status, IPs, force switch dropdown, monitoring toggle
+            ├── Toast.tsx        # Toast notification system (error/success popups)
+            └── ActivityLog.tsx  # Collapsible event log panel (failover/revert/manual switch history)
 ```
 
 ---
@@ -77,8 +79,9 @@ dns-failover-manager/
 ### ✅ Backend API
 - **CRUD** for domains: `GET/POST/PUT/DELETE /api/domains`, `GET /api/domains/:id`
 - **Force switch**: `POST /api/domains/:id/switch` — updates Cloudflare DNS then DB
+- **Monitoring toggle**: `POST /api/domains/:id/monitoring` — pause/resume health checks per domain
 - **Health status**: `GET /api/domains/:id/health`
-- **Event log**: `GET /api/domains/:id/events`
+- **Event log**: `GET /api/domains/:id/events` (per domain), `GET /api/events?limit=50` (global)
 - **App health**: `GET /api/health`
 - Auto-discovers `record_id` from Cloudflare when not provided (on create + on switch)
 
@@ -92,6 +95,7 @@ dns-failover-manager/
 ### ✅ Health Check Worker (`health_checker.py`)
 - Background `asyncio` loop started in FastAPI lifespan (NOT APScheduler — uses simple `asyncio.sleep` loop)
 - Runs every `DEFAULT_CHECK_INTERVAL` seconds (default: 30)
+- Only checks domains with `monitoring_enabled=true`
 - Check methods per `check_type`:
   - **ping** — `ping -c 3 -W 3 <ip>`, 12s timeout
   - **tcp** — `asyncio.open_connection(ip, port)`, 3s timeout
@@ -101,13 +105,19 @@ dns-failover-manager/
 - **Auto-revert**: if `auto_revert=true` and primary comes back healthy, switch back
 - Per-domain `asyncio.Lock` prevents concurrent failover
 
+### ✅ Cleanup Worker
+- Background `asyncio` loop runs every `CLEANUP_INTERVAL_HOURS` (default: 6h)
+- Deletes `health_check_log` entries older than `LOG_RETENTION_DAYS` (default: 7)
+- Deletes `failover_events` older than `EVENT_RETENTION_DAYS` (default: 30)
+
 ### ✅ Frontend Dashboard
 - **Card layout** — each domain as a card (not table, avoids overflow/clipping issues)
 - **DomainForm** — adaptive form: shows endpoint+status for HTTP/HTTPS, port for TCP, info banner for Ping
 - **DomainRow** — shows domain name, active/primary/backup IPs, health status (🟢/🔴), force switch dropdown
 - **Force Switch** — click-outside-to-close dropdown with IP list, health indicators, labels (active/primary/backup#)
 - **Monitoring Toggle** — Pause/Resume button per domain; paused domains show PAUSED badge and dimmed card
-- Polls `/api/domains` + `/api/domains/:id/health` every 10s
+- **Activity Log** — collapsible panel showing recent failover/revert/manual switch events with domain name, IPs, time ago
+- Polls `/api/domains` + `/api/domains/:id/health` + `/api/events` every 10s
 
 ---
 
@@ -146,6 +156,9 @@ DEFAULT_CHECK_INTERVAL=30
 FAILURE_THRESHOLD=3
 SUCCESS_THRESHOLD=2
 LOG_LEVEL=INFO
+LOG_RETENTION_DAYS=7
+EVENT_RETENTION_DAYS=30
+CLEANUP_INTERVAL_HOURS=6
 ```
 
 ---
@@ -160,6 +173,11 @@ LOG_LEVEL=INFO
 6. **record_id auto-discovery** → if `record_id` is null, it's auto-fetched from Cloudflare on domain create and on force switch; stored in DB once discovered
 7. **Hot reload** → backend (Uvicorn `--reload`) and frontend (Vite HMR) pick up file changes automatically; `.env` changes require `docker compose restart backend`
 8. **Docker only** → no local Python/Node installs; everything runs in containers
+9. **Health status unique constraint** → `UNIQUE(domain_id, ip)` on `health_status`; IPs are deduplicated on create/update to avoid constraint violations
+10. **Flush before insert** → when updating domain backup IPs, `await db.flush()` after DELETE before inserting new health_status rows
+11. **Frontend validation** → DomainForm validates domain name format, IP addresses, zone/record ID format (32-char hex), port ranges, intervals before submission
+12. **Toast notifications** → all API errors shown to user via toast popups (bottom-right, auto-dismiss 5s); error detail extracted from response body
+13. **Teleport proxy** → `vite.config.ts` uses `allowedHosts: true`; all services share `teleport-network` external Docker network
 
 ---
 
@@ -167,7 +185,6 @@ LOG_LEVEL=INFO
 
 - [ ] Alembic migrations (currently using `create_all` on startup)
 - [ ] Notifications (Telegram / Slack / Email / webhook)
-- [ ] Event log page in UI
 - [ ] Domain detail page with check history graph
 - [ ] Global settings page in UI
 - [ ] Per-domain check interval (worker currently uses global interval)

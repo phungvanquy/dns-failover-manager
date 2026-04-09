@@ -5,8 +5,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-dns_failover}
-    ports:
-      - "5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -14,13 +12,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - teleport-network
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
     environment:
@@ -33,17 +31,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - teleport-network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - 3000:3000
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - teleport-network
 
-
+networks:
+  teleport-network:
+    external: true

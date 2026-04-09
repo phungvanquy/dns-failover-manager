@@ -4,6 +4,7 @@ import { useToast } from './components/Toast'
 import type { Domain, HealthStatus } from './types'
 import DomainForm from './components/DomainForm'
 import DomainRow from './components/DomainRow'
+import ActivityLog from './components/ActivityLog'
 
 export default function App() {
   const toast = useToast()
@@ -74,6 +75,10 @@ export default function App() {
             No domains configured. Click "+ Add Domain" to get started.
           </div>
         )}
+      </div>
+
+      <div className="mt-6">
+        <ActivityLog />
       </div>
     </div>
   )
