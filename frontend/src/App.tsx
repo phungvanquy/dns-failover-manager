@@ -33,6 +33,7 @@ export default function App() {
     if (!confirm('Delete this domain?')) return
     try {
       await api.del(`/domains/${id}`)
+      toast.showSuccess('Domain deleted successfully')
       loadDomains()
     } catch (err: any) {
       toast.showError(err.message || 'Failed to delete domain')
@@ -40,9 +41,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">🌐 DNS Failover Manager</h1>
+    <div className="min-h-screen p-4 sm:p-6 max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">🌐 DNS Failover Manager</h1>
         <button
           onClick={() => { setEditDomain(null); setShowForm(true) }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"

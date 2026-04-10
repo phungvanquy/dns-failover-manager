@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class BackupIPBase(BaseModel):
     ip: str
     priority: int
+    description: str | None = None
 
 
 class BackupIPCreate(BackupIPBase):
@@ -25,6 +26,7 @@ class DomainBase(BaseModel):
     zone_id: str
     record_id: str | None = None
     primary_ip: str
+    primary_ip_description: str | None = None
     auto_revert: bool = True
     check_type: str = "http"
     check_endpoint: str = "/"
@@ -44,6 +46,7 @@ class DomainUpdate(BaseModel):
     zone_id: str | None = None
     record_id: str | None = None
     primary_ip: str | None = None
+    primary_ip_description: str | None = None
     auto_revert: bool | None = None
     check_type: str | None = None
     check_endpoint: str | None = None

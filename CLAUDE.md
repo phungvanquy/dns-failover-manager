@@ -112,11 +112,16 @@ dns-failover-manager/
 
 ### ✅ Frontend Dashboard
 - **Card layout** — each domain as a card (not table, avoids overflow/clipping issues)
+- **Modal form** — DomainForm renders as a centered modal popup with dark overlay backdrop (not inline at top of page)
 - **DomainForm** — adaptive form: shows endpoint+status for HTTP/HTTPS, port for TCP, info banner for Ping
-- **DomainRow** — shows domain name, active/primary/backup IPs, health status (🟢/🔴), force switch dropdown
-- **Force Switch** — click-outside-to-close dropdown with IP list, health indicators, labels (active/primary/backup#)
+- **IP descriptions** — optional description field for primary IP and each backup IP; shown as small gray text below each IP on all devices (mobile-friendly, no hover required); `title` attribute kept for desktop hover tooltip
+- **DomainRow** — shows domain name, active/primary/backup IPs with descriptions, health status (🟢/🔴), force switch dropdown
+- **Force Switch** — click-outside-to-close dropdown with IP list, health indicators, labels (active/primary/backup#), IP descriptions
 - **Monitoring Toggle** — Pause/Resume button per domain; paused domains show PAUSED badge and dimmed card
+- **Success toasts** — green toast notifications for all successful actions (create/update/delete domain, force switch, pause/resume monitoring)
 - **Activity Log** — collapsible panel showing recent failover/revert/manual switch events with domain name, IPs, time ago
+- **Responsive design** — mobile-first: stacking layouts on small screens (`grid-cols-1` → `sm:grid-cols-2` → `md:grid-cols-4`), wrapping header buttons, scrollable modal, `break-all` on IPs
+- **Favicon** — 🌐 emoji as browser tab icon via inline SVG data URI
 - Polls `/api/domains` + `/api/domains/:id/health` + `/api/events` every 10s
 
 ---
@@ -124,11 +129,11 @@ dns-failover-manager/
 ## 🗄️ Database Schema
 
 ```
-domains: id, name(unique), zone_id, record_id, primary_ip, active_ip, auto_revert,
-         check_type, check_endpoint, check_port, check_interval, expected_status, ttl,
-         monitoring_enabled, created_at, updated_at
+domains: id, name(unique), zone_id, record_id, primary_ip, primary_ip_description(nullable),
+         active_ip, auto_revert, check_type, check_endpoint, check_port, check_interval,
+         expected_status, ttl, monitoring_enabled, created_at, updated_at
 
-backup_ips: id, domain_id(FK), ip, priority, created_at
+backup_ips: id, domain_id(FK), ip, priority, description(nullable), created_at
 
 health_status: id, domain_id(FK), ip, is_healthy, consecutive_failures,
                consecutive_successes, last_checked, last_status_change
@@ -176,8 +181,9 @@ CLEANUP_INTERVAL_HOURS=6
 9. **Health status unique constraint** → `UNIQUE(domain_id, ip)` on `health_status`; IPs are deduplicated on create/update to avoid constraint violations
 10. **Flush before insert** → when updating domain backup IPs, `await db.flush()` after DELETE before inserting new health_status rows
 11. **Frontend validation** → DomainForm validates domain name format, IP addresses, zone/record ID format (32-char hex), port ranges, intervals before submission
-12. **Toast notifications** → all API errors shown to user via toast popups (bottom-right, auto-dismiss 5s); error detail extracted from response body
+12. **Toast notifications** → all API errors AND success messages shown to user via toast popups (bottom-right, auto-dismiss 5s); error detail extracted from response body
 13. **Teleport proxy** → `vite.config.ts` uses `allowedHosts: true`; all services share `teleport-network` external Docker network
+14. **IP descriptions** → optional `description` on backup IPs and `primary_ip_description` on domains; displayed as sub-text below each IP (visible on mobile without hover); also available as `title` tooltip on desktop
 
 ---
 

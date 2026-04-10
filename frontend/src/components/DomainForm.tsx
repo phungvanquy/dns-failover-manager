@@ -24,6 +24,7 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
   const [zoneId, setZoneId] = useState(domain?.zone_id ?? '')
   const [recordId, setRecordId] = useState(domain?.record_id ?? '')
   const [primaryIp, setPrimaryIp] = useState(domain?.primary_ip ?? '')
+  const [primaryIpDescription, setPrimaryIpDescription] = useState(domain?.primary_ip_description ?? '')
   const [checkType, setCheckType] = useState(domain?.check_type ?? 'http')
   const [checkEndpoint, setCheckEndpoint] = useState(domain?.check_endpoint ?? '/')
   const [checkPort, setCheckPort] = useState(domain?.check_port ?? 80)
@@ -32,7 +33,7 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
   const [ttl, setTtl] = useState(domain?.ttl ?? 60)
   const [autoRevert, setAutoRevert] = useState(domain?.auto_revert ?? true)
   const [backupIps, setBackupIps] = useState(
-    domain?.backup_ips.map(b => b.ip) ?? ['']
+    domain?.backup_ips.map(b => ({ ip: b.ip, description: b.description ?? '' })) ?? [{ ip: '', description: '' }]
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -56,9 +57,9 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
     if (checkInterval > 3600) errs.checkInterval = 'Interval must be at most 3600 seconds'
     if (ttl < 1) errs.ttl = 'TTL must be at least 1 second'
     if (ttl > 86400) errs.ttl = 'TTL must be at most 86400 seconds'
-    const filledBackups = backupIps.filter(ip => ip.trim())
-    filledBackups.forEach((ip, i) => {
-      if (!isValidIp(ip.trim())) errs[`backupIp_${i}`] = `Backup IP #${i + 1}: invalid IP address`
+    const filledBackups = backupIps.filter(b => b.ip.trim())
+    filledBackups.forEach((b, i) => {
+      if (!isValidIp(b.ip.trim())) errs[`backupIp_${i}`] = `Backup IP #${i + 1}: invalid IP address`
     })
     return errs
   }
@@ -73,13 +74,14 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
     }
     const body = {
       name: name.trim(), zone_id: zoneId.trim(), record_id: recordId.trim() || null, primary_ip: primaryIp.trim(),
+      primary_ip_description: primaryIpDescription.trim() || null,
       check_type: checkType,
       check_endpoint: isHttp ? checkEndpoint : '/',
       check_port: isTcp ? checkPort : (checkType === 'https' ? 443 : 80),
       check_interval: checkInterval,
       expected_status: isHttp ? expectedStatus : 200,
       ttl, auto_revert: autoRevert,
-      backup_ips: backupIps.filter(ip => ip.trim()).map((ip, i) => ({ ip: ip.trim(), priority: i + 1 })),
+      backup_ips: backupIps.filter(b => b.ip.trim()).map((b, i) => ({ ip: b.ip.trim(), priority: i + 1, description: b.description.trim() || null })),
     }
     try {
       if (domain) {
@@ -87,6 +89,7 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
       } else {
         await api.post('/domains', body)
       }
+      toast.showSuccess(domain ? 'Domain updated successfully' : 'Domain created successfully')
       onSaved()
     } catch (err: any) {
       toast.showError(err.message || 'Failed to save domain')
@@ -98,9 +101,10 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
   const errText = "text-red-500 text-xs mt-0.5"
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 mb-6">
-      <h2 className="text-lg font-semibold mb-4">{domain ? 'Edit' : 'Add'} Domain</h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-2xl my-4 sm:my-8">
+        <h2 className="text-lg font-semibold mb-4">{domain ? 'Edit' : 'Add'} Domain</h2>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <input className={`${input} ${errors.name ? inputErr : ''}`} placeholder="Domain name (e.g. example.com)" value={name} onChange={e => setName(e.target.value)} required />
           {errors.name && <p className={errText}>{errors.name}</p>}
@@ -116,6 +120,9 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
         <div>
           <input className={`${input} ${errors.primaryIp ? inputErr : ''}`} placeholder="Primary IP (e.g. 1.2.3.4)" value={primaryIp} onChange={e => setPrimaryIp(e.target.value)} required />
           {errors.primaryIp && <p className={errText}>{errors.primaryIp}</p>}
+        </div>
+        <div className="sm:col-span-2">
+          <input className={input} placeholder="Primary IP description (optional)" value={primaryIpDescription} onChange={e => setPrimaryIpDescription(e.target.value)} />
         </div>
 
         <div>
@@ -168,41 +175,44 @@ export default function DomainForm({ domain, onClose, onSaved }: Props) {
         </label>
 
         {checkType === 'ping' && (
-          <div className="col-span-2 bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
+          <div className="sm:col-span-2 bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
             ℹ️ Ping check sends ICMP echo requests — no endpoint, port, or status code needed.
           </div>
         )}
 
         {isTcp && (
-          <div className="col-span-2 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+          <div className="sm:col-span-2 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
             ℹ️ TCP check attempts a socket connection to the specified port — no endpoint or status code needed.
           </div>
         )}
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="font-medium text-sm">Backup IPs (in priority order)</label>
-          {backupIps.map((ip, i) => (
-            <div key={i} className="mt-1">
-              <div className="flex gap-2">
-                <input className={`${input} ${errors[`backupIp_${i}`] ? inputErr : ''}`} placeholder={`Backup IP #${i + 1} (e.g. 1.2.3.4)`} value={ip}
-                  onChange={e => { const n = [...backupIps]; n[i] = e.target.value; setBackupIps(n) }} />
+          {backupIps.map((b, i) => (
+            <div key={i} className="mt-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input className={`${input} ${errors[`backupIp_${i}`] ? inputErr : ''} sm:flex-1`} placeholder={`Backup IP #${i + 1} (e.g. 1.2.3.4)`} value={b.ip}
+                  onChange={e => { const n = [...backupIps]; n[i] = { ...n[i], ip: e.target.value }; setBackupIps(n) }} />
+                <input className={`${input} sm:flex-1`} placeholder="Description (optional)" value={b.description}
+                  onChange={e => { const n = [...backupIps]; n[i] = { ...n[i], description: e.target.value }; setBackupIps(n) }} />
                 <button type="button" onClick={() => setBackupIps(backupIps.filter((_, j) => j !== i))}
-                  className="text-red-500 hover:text-red-700 px-2">✕</button>
+                  className="text-red-500 hover:text-red-700 px-2 self-center">✕</button>
               </div>
               {errors[`backupIp_${i}`] && <p className={errText}>{errors[`backupIp_${i}`]}</p>}
             </div>
           ))}
-          <button type="button" onClick={() => setBackupIps([...backupIps, ''])}
-            className="text-blue-600 text-sm mt-1">+ Add backup IP</button>
+          <button type="button" onClick={() => setBackupIps([...backupIps, { ip: '', description: '' }])}
+            className="text-blue-600 text-sm mt-2">+ Add backup IP</button>
         </div>
 
-        <div className="col-span-2 flex gap-2 justify-end">
+        <div className="sm:col-span-2 flex gap-2 justify-end pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancel</button>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
             {domain ? 'Update' : 'Create'}
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   )
 }

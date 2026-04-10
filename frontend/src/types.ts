@@ -2,6 +2,7 @@ export interface BackupIP {
   id: string;
   ip: string;
   priority: number;
+  description?: string | null;
 }
 
 export interface Domain {
@@ -10,6 +11,7 @@ export interface Domain {
   zone_id: string;
   record_id: string | null;
   primary_ip: string;
+  primary_ip_description?: string | null;
   active_ip: string;
   auto_revert: boolean;
   check_type: string;

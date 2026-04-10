@@ -40,6 +40,7 @@ async def create_domain(data: DomainCreate, db: AsyncSession = Depends(get_db)):
         zone_id=data.zone_id,
         record_id=record_id,
         primary_ip=data.primary_ip,
+        primary_ip_description=data.primary_ip_description,
         active_ip=data.primary_ip,
         auto_revert=data.auto_revert,
         check_type=data.check_type,
@@ -54,7 +55,7 @@ async def create_domain(data: DomainCreate, db: AsyncSession = Depends(get_db)):
     await db.flush()
 
     for bp in data.backup_ips:
-        db.add(BackupIP(domain_id=domain.id, ip=bp.ip, priority=bp.priority))
+        db.add(BackupIP(domain_id=domain.id, ip=bp.ip, priority=bp.priority, description=bp.description))
 
     # Create health status entries for all unique IPs
     all_ips = dict.fromkeys([data.primary_ip] + [bp.ip for bp in data.backup_ips])
@@ -96,7 +97,7 @@ async def update_domain(domain_id: uuid.UUID, data: DomainUpdate, db: AsyncSessi
     if backup_ips_data is not None:
         await db.execute(delete(BackupIP).where(BackupIP.domain_id == domain_id))
         for bp in backup_ips_data:
-            db.add(BackupIP(domain_id=domain_id, ip=bp["ip"], priority=bp["priority"]))
+            db.add(BackupIP(domain_id=domain_id, ip=bp["ip"], priority=bp["priority"], description=bp.get("description")))
         # Rebuild health statuses
         await db.execute(delete(HealthStatus).where(HealthStatus.domain_id == domain_id))
         await db.flush()
